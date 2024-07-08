@@ -30,6 +30,14 @@ async function run() {
 
     const volunteerCollection = client.db("charity").collection("volunteers");
 
+    app.get("/volunteers", async (req, res) => {
+      const query = {};
+      const sort = { deadline_time: 1 };
+      const cursor = volunteerCollection.find(query).sort(sort);
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
     app.post("/volunteers", async (req, res) => {
       const volunteer = req.body;
       const result = await volunteerCollection.insertOne(volunteer);
