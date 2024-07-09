@@ -38,12 +38,21 @@ async function run() {
       res.send(result);
     });
 
-    app.get('/volunteers/:id', async(req, res)=>{
+    app.get("/volunteers/:id", async (req, res) => {
       const id = req.params.id;
-      const query = {_id: new ObjectId(id)};
+      const query = { _id: new ObjectId(id) };
       const result = await volunteerCollection.findOne(query);
-      res.send(result)
-    })
+      res.send(result);
+    });
+
+    app.get("/volunteer", async (req, res) => {
+      let query = {};
+      if (req.query?.email) {
+        query = { email: req.query.email };
+      }
+      const result = await volunteerCollection.find(query).toArray();
+      res.send(result);
+    });
 
     app.post("/volunteers", async (req, res) => {
       const volunteer = req.body;
