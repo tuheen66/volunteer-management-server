@@ -60,6 +60,31 @@ async function run() {
       res.send(result);
     });
 
+    app.put("/volunteers/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const options = { upsert: true };
+      const updatedVolunteerPost = req.body;
+      const volunteerPost = {
+        $set: {
+          photo: updatedVolunteerPost.photo,
+          category: updatedVolunteerPost.category,
+          location: updatedVolunteerPost.location,
+          post_title: updatedVolunteerPost.post_title,
+          volunteers: updatedVolunteerPost.volunteers,
+          description: updatedVolunteerPost.description,
+          current_time: updatedVolunteerPost.current_time,
+          deadline_time: updatedVolunteerPost.deadline_time,
+        },
+      };
+      const result = await volunteerCollection.updateOne(
+        filter,
+        volunteerPost,
+        options
+      );
+      res.send(result);
+    });
+
     app.delete("/volunteers/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
