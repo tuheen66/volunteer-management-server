@@ -29,7 +29,9 @@ async function run() {
     await client.connect();
 
     const volunteerCollection = client.db("charity").collection("volunteers");
-    const volunteerRequestCollection = client.db("charity").collection("requested");
+    const volunteerRequestCollection = client
+      .db("charity")
+      .collection("requested");
 
     app.get("/volunteers", async (req, res) => {
       const query = {};
@@ -93,21 +95,24 @@ async function run() {
       res.send(result);
     });
 
-
-
     // request apis
 
-    app.post("/requested", async (req, res) => {
-      const volunteerRequest = req.body;
-      const result = await volunteerRequestCollection.insertOne(volunteerRequest);
+    app.get("/requested", async (req, res) => {
+      let query = {};
+      if (req.query?.volunteerEmail) {
+        query = { volunteerEmail: req.query.volunteerEmail };
+      }
+      const result = await volunteerRequestCollection.find(query).toArray();
       res.send(result);
     });
 
-
-
-
-
-
+    app.post("/requested", async (req, res) => {
+      const volunteerRequest = req.body;
+      const result = await volunteerRequestCollection.insertOne(
+        volunteerRequest
+      );
+      res.send(result);
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
