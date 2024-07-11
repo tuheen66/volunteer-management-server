@@ -1,16 +1,23 @@
 const express = require("express");
 const cors = require("cors");
+const jwt = require("jsonwebtoken");
+const cookieParser = require("cookie-parser");
 require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 const port = process.env.PORT || 5000;
 
 // middleware
-app.use(cors());
+app.use(
+  cors({
+    origin: ["http://localhost:5173"],
+    credentials: true,
+  })
+);
 app.use(express.json());
+app.use(cookieParser());
 
-// volunteerMaster
-// BeXgPNb4frMGFqGF
+
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.1gnzeig.mongodb.net/?appName=Cluster0`;
 
@@ -33,6 +40,25 @@ async function run() {
       .db("charity")
       .collection("requested");
 
+    // auth related apis
+
+    app.post("/jwt", async (req, res) => {
+      const user = req.body;
+      console.log(user);
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: "1hr",
+      });
+      res
+        .cookie("token", token, {
+          httpOnly: true,
+          secure: true,
+          sameSite: "none",
+        })
+        .send({ success: true });
+    });
+
+    // volunteer related apis
+
     app.get("/volunteers", async (req, res) => {
       const query = {};
       const sort = { deadline_time: 1 };
@@ -48,7 +74,9 @@ async function run() {
       res.send(result);
     });
 
+    //jwt
     app.get("/volunteer", async (req, res) => {
+      
       let query = {};
       if (req.query?.email) {
         query = { email: req.query.email };
@@ -97,6 +125,7 @@ async function run() {
 
     // request apis
 
+    //jwt
     app.get("/requested", async (req, res) => {
       let query = {};
       if (req.query?.volunteerEmail) {
@@ -120,9 +149,6 @@ async function run() {
       const result = await volunteerRequestCollection.deleteOne(query);
       res.send(result);
     });
-
-
-
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
