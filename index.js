@@ -10,14 +10,16 @@ const port = process.env.PORT || 5000;
 // middleware
 app.use(
   cors({
-    origin: ["http://localhost:5173"],
+    origin: [
+      "http://localhost:5173",
+      "https://benevo-8b9b0.web.app",
+      "https://benevo-8b9b0.firebaseapp.com",
+    ],
     credentials: true,
   })
 );
 app.use(express.json());
 app.use(cookieParser());
-
-
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.1gnzeig.mongodb.net/?appName=Cluster0`;
 
@@ -30,10 +32,42 @@ const client = new MongoClient(uri, {
   },
 });
 
+const logger = async (req, res, next) => {
+  console.log("called:", req.hostname, req.originalUrl);
+  next();
+};
+
+const verifyToken = async (req, res, next) => {
+  const token = req.cookies?.token;
+  console.log("value of token in the middleware", token);
+
+  if (!token) {
+    return res.status(401).send({ message: "unauthorized" });
+  }
+
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+    //err
+    if (err) {
+      console.log(err);
+      return res.status(401).send({ message: "unauthorized" });
+    }
+    // valid token then decoded
+    console.log("value in the token", decoded);
+    req.user = decoded;
+    next();
+  });
+};
+
+const cookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+};
+
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    //await client.connect();
 
     const volunteerCollection = client.db("charity").collection("volunteers");
     const volunteerRequestCollection = client
@@ -42,24 +76,26 @@ async function run() {
 
     // auth related apis
 
-    app.post("/jwt", async (req, res) => {
+    app.post("/jwt", logger, async (req, res) => {
       const user = req.body;
       console.log(user);
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
-        expiresIn: "1hr",
+        expiresIn: "1yr",
       });
+      res.cookie("token", token, cookieOptions).send({ success: true });
+    });
+
+    app.post("/logout", async (req, res) => {
+      const user = req.body;
+      console.log("logging out", user);
       res
-        .cookie("token", token, {
-          httpOnly: true,
-          secure: true,
-          sameSite: "none",
-        })
+        .clearCookie("token", { ...cookieOptions, maxAge: 0 })
         .send({ success: true });
     });
 
     // volunteer related apis
 
-    app.get("/volunteers", async (req, res) => {
+    app.get("/volunteers", logger, async (req, res) => {
       const query = {};
       const sort = { deadline_time: 1 };
       const cursor = volunteerCollection.find(query).sort(sort);
@@ -75,8 +111,11 @@ async function run() {
     });
 
     //jwt
-    app.get("/volunteer", async (req, res) => {
-      
+    app.get("/volunteer", logger, verifyToken, async (req, res) => {
+      console.log("valid token", req.user);
+      if (req.query.email !== req.user.email) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
       let query = {};
       if (req.query?.email) {
         query = { email: req.query.email };
@@ -126,7 +165,12 @@ async function run() {
     // request apis
 
     //jwt
-    app.get("/requested", async (req, res) => {
+    app.get("/requested", logger, verifyToken, async (req, res) => {
+      console.log("valid token", req.user);
+
+      if (req.query.email !== req.user.volunteerEmail) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
       let query = {};
       if (req.query?.volunteerEmail) {
         query = { volunteerEmail: req.query.volunteerEmail };
@@ -151,7 +195,7 @@ async function run() {
     });
 
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
+    //await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
